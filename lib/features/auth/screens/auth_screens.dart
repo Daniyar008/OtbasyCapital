@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/app_scope.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/validators.dart';
+import '../../../core/utils/auth_errors.dart';
 import '../../../shared/widgets/app_widgets.dart';
 import '../../../shared/widgets/result_screen.dart';
 
@@ -105,7 +106,17 @@ class _LoginScreenState extends State<LoginScreen> {
   final _form = GlobalKey<FormState>();
   final _email = TextEditingController(text: 'daniyar@example.com');
   final _password = TextEditingController(text: 'Demo2026');
-  bool _hidden = true;
+  bool _hidden = true, _busy = false, _initialized = false;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized && AppScope.of(context).cloudEnabled) {
+      _email.clear();
+      _password.clear();
+    }
+    _initialized = true;
+  }
+
   @override
   void dispose() {
     _email.dispose();
@@ -113,10 +124,17 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _login() {
+  Future<void> _login() async {
     if (!_form.currentState!.validate()) return;
-    AppScope.of(context).signIn(_email.text);
-    context.go('/home');
+    setState(() => _busy = true);
+    try {
+      await AppScope.of(context).login(_email.text, _password.text);
+      if (mounted) context.go('/home');
+    } catch (error) {
+      if (mounted) showMessage(context, authErrorMessage(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -149,7 +167,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
-      AppButton('Кіру', onPressed: _login),
+      AppButton('Кіру', busy: _busy, onPressed: _login),
       AppButton(
         'Құпиясөзді ұмыттыңыз ба?',
         kind: ButtonKind.quiet,
@@ -160,9 +178,11 @@ class _LoginScreenState extends State<LoginScreen> {
         kind: ButtonKind.secondary,
         onPressed: () => context.push('/register'),
       ),
-      const Text(
-        'Оқу режимі. Email мен құпиясөз серверде тексерілмейді. '
-        'Мысал: daniyar@example.com / Demo2026.',
+      Text(
+        AppScope.of(context).cloudEnabled
+            ? 'Тіркелген email мен құпиясөзіңізді енгізіңіз.'
+            : 'Оқу режимі. Email мен құпиясөз серверде тексерілмейді. '
+                  'Мысал: daniyar@example.com / Demo2026.',
         style: AppTheme.caption,
       ),
     ],
@@ -181,6 +201,37 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _repeat = TextEditingController();
+  bool _busy = false;
+
+  Future<void> _register() async {
+    if (!_form.currentState!.validate()) return;
+    setState(() => _busy = true);
+    try {
+      final ready = await AppScope.of(context)
+          .register(_email.text, _password.text, _name.text);
+      if (!mounted) return;
+      if (ready) {
+        context.go('/family-setup');
+      } else {
+        context.go(
+          '/result',
+          extra: const ResultData(
+            title: 'Email мекенжайын растаңыз',
+            message:
+                'Тіркелу сұрауы қабылданды. Email-ге келген сілтемені ашып, '
+                'осы қосымшаға оралыңыз және құпиясөзіңізбен кіріңіз.',
+            destination: '/login',
+            button: 'Кіруге өту',
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) showMessage(context, authErrorMessage(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   void dispose() {
     for (final c in [_name, _email, _password, _repeat]) {
@@ -230,17 +281,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         'Кемінде 8 таңба, бір сан және бір бас әріп.',
         style: AppTheme.caption,
       ),
-      AppButton(
-        'Тіркелу',
-        onPressed: () {
-          if (!_form.currentState!.validate()) return;
-          AppScope.of(context).signIn(_email.text, name: _name.text);
-          context.go('/family-setup');
-        },
-      ),
-      const Text(
-        'Оқу нұсқасында тіркелу интерфейсі көрсетіледі. '
-        'Нақты серверлік аккаунт құрылмайды.',
+      AppButton('Тіркелу', busy: _busy, onPressed: _register),
+      Text(
+        AppScope.of(context).cloudEnabled
+            ? 'Аккаунт Supabase жүйесінде тіркеледі. Email-ді растау қажет болуы мүмкін.'
+            : 'Оқу нұсқасында тіркелу интерфейсі көрсетіледі. '
+                  'Нақты серверлік аккаунт құрылмайды.',
         style: AppTheme.caption,
       ),
     ],
@@ -342,34 +388,37 @@ class _FamilySetupScreenState extends State<FamilySetupScreen> {
           ],
         ),
       ),
-      Form(
-        key: _joinForm,
-        child: Column(
-          children: [
-            AppField(
-              'Шақыру коды',
-              controller: _code,
-              hint: 'OTB-2026',
-              validator: (value) => value?.trim().toUpperCase() == 'OTB-2026'
-                  ? null
-                  : 'Оқу мысалының коды: OTB-2026',
-            ),
-            const SizedBox(height: 20),
-            AppButton(
-              'Отбасына қосылу',
-              kind: ButtonKind.secondary,
-              onPressed: () async {
-                if (!_joinForm.currentState!.validate()) return;
-                await AppScope.of(context).setFamily('Сұлтангереевтер');
-                if (context.mounted) context.go('/home');
-              },
-            ),
-          ],
+      if (!AppScope.of(context).cloudEnabled)
+        Form(
+          key: _joinForm,
+          child: Column(
+            children: [
+              AppField(
+                'Шақыру коды',
+                controller: _code,
+                hint: 'OTB-2026',
+                validator: (value) => value?.trim().toUpperCase() == 'OTB-2026'
+                    ? null
+                    : 'Оқу мысалының коды: OTB-2026',
+              ),
+              const SizedBox(height: 20),
+              AppButton(
+                'Отбасына қосылу',
+                kind: ButtonKind.secondary,
+                onPressed: () async {
+                  if (!_joinForm.currentState!.validate()) return;
+                  await AppScope.of(context).setFamily('Сұлтангереевтер');
+                  if (context.mounted) context.go('/home');
+                },
+              ),
+            ],
+          ),
         ),
-      ),
-      const Text(
-        'Жеке жазба тек оның иесіне қолжетімді. '
-        'Бұл нұсқада отбасы деректері осы құрылғыда сақталады.',
+      Text(
+        AppScope.of(context).cloudEnabled
+            ? 'Отбасы деректері аккаунтыңызда сақталады. Басқа аккаунттарды шақыру әзірге қосылмаған.'
+            : 'Жеке жазба тек оның иесіне қолжетімді. '
+                  'Бұл нұсқада отбасы деректері осы құрылғыда сақталады.',
         style: AppTheme.caption,
       ),
     ],

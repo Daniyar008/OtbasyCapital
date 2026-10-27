@@ -46,6 +46,11 @@ class ResultScreen extends StatelessWidget {
             store.storageError!,
             style: AppTheme.body.copyWith(color: AppColors.red),
           ),
+        if (store.cloudError != null)
+          Text(
+            store.cloudError!,
+            style: AppTheme.body.copyWith(color: AppColors.red),
+          ),
         AppButton(data.button, onPressed: () => context.go(data.destination)),
         if (data.secondaryDestination != null)
           AppButton(

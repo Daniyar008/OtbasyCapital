@@ -56,3 +56,5 @@ app.*.map.json
 android/local.properties
 verification/
 .github/modernize/
+/output/
+/tmp/

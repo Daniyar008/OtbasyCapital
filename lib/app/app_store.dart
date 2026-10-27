@@ -3,15 +3,100 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../core/services/storage_service.dart';
+import '../core/services/cloud_storage_service.dart';
 import '../features/transactions/models/money_entry.dart';
 import '../features/goals/models/savings_goal.dart';
 import '../features/reminders/models/payment_reminder.dart';
 
 class AppStore extends ChangeNotifier {
-  AppStore({required this.storage}) {
+  AppStore({required this.storage, this.cloud}) {
     _seed();
+    cloud?.addListener(notifyListeners);
   }
   final StorageService storage;
+  final CloudStorageService? cloud;
+  bool get cloudEnabled => cloud != null;
+  String? get cloudError => cloud?.cloudError;
+  Future<void>? _cloudRefresh;
+  bool get syncing => _cloudRefresh != null || (cloud?.syncing ?? false);
+
+  Future<void> login(String email, String password) async {
+    if (cloud == null) {
+      signIn(email);
+      return;
+    }
+    await _cloudRefresh;
+    await _pendingWrite;
+    await cloud!.backend.signIn(email, password);
+    await restoreCloudAccount();
+  }
+
+  Future<bool> register(String email, String password, String name) async {
+    if (cloud == null) {
+      signIn(email, name: name);
+      return true;
+    }
+    await _cloudRefresh;
+    await _pendingWrite;
+    final ready = await cloud!.backend.signUp(email, password, name);
+    if (ready) await restoreCloudAccount();
+    return ready;
+  }
+
+  void _emptyCloudAccount() {
+    _seed();
+    _entries = [];
+    _goals = [];
+    _reminders = [];
+    final account = cloud!.backend.account!;
+    name = account.name;
+    email = account.email;
+    family = '${account.name} отбасы';
+    final now = DateTime.now();
+    period = DateTime(now.year, now.month);
+  }
+
+  Future<void> restoreCloudAccount() async {
+    if (cloud?.backend.account == null) return;
+    _emptyCloudAccount();
+    await load();
+    name = cloud!.backend.account!.name;
+    email = cloud!.backend.account!.email;
+    signedIn = true;
+    notifyListeners();
+  }
+
+  Future<void> syncCloud() => _cloudRefresh ??= _refreshCloud().whenComplete(
+    () => _cloudRefresh = null,
+  );
+
+  Future<void> _refreshCloud() async {
+    await _pendingWrite;
+    await load();
+  }
+
+  Future<void> logout() async {
+    await _cloudRefresh;
+    await _pendingWrite;
+    if (cloud != null) {
+      await cloud!.backend.signOut();
+      _seed();
+      _entries = [];
+      _goals = [];
+      _reminders = [];
+      name = '';
+      email = '';
+      family = '';
+    }
+    signOut();
+  }
+
+  @override
+  void dispose() {
+    cloud?.removeListener(notifyListeners);
+    super.dispose();
+  }
+
   bool signedIn = false;
   String name = 'Данияр',
       email = 'daniyar@example.com',
@@ -71,6 +156,7 @@ class AppStore extends ChangeNotifier {
 
   String newId() => DateTime.now().microsecondsSinceEpoch.toString();
   void signIn(String email, {String? name}) {
+    if (cloud != null) throw StateError('Use Supabase login');
     this.email = email.trim();
     if (name != null && name.trim().isNotEmpty) this.name = name.trim();
     signedIn = true;
@@ -93,11 +179,13 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<void> setFamily(String value) async {
+    await _cloudRefresh;
     family = value.trim();
     await _changed();
   }
 
   Future<void> saveEntry(MoneyEntry value) async {
+    await _cloudRefresh;
     if (value.amount <= 0 || value.title.trim().isEmpty) {
       throw ArgumentError('Invalid operation');
     }
@@ -113,11 +201,13 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<void> deleteEntry(String id) async {
+    await _cloudRefresh;
     _entries.removeWhere((e) => e.id == id);
     await _changed();
   }
 
   Future<void> toggleFavorite(String id) async {
+    await _cloudRefresh;
     final index = _entries.indexWhere((e) => e.id == id);
     if (index >= 0) {
       _entries[index] = _entries[index].copyWith(
@@ -128,6 +218,7 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<void> addGoal(SavingsGoal value) async {
+    await _cloudRefresh;
     if (value.target <= 0 || value.title.trim().isEmpty) {
       throw ArgumentError('Invalid goal');
     }
@@ -136,6 +227,7 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<void> contribute(String id, int amount) async {
+    await _cloudRefresh;
     if (amount <= 0) throw ArgumentError('Invalid contribution');
     final index = _goals.indexWhere((e) => e.id == id);
     if (index < 0) throw StateError('Goal not found');
@@ -144,11 +236,13 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<void> addReminder(PaymentReminder value) async {
+    await _cloudRefresh;
     _reminders.add(value);
     await _changed();
   }
 
   Future<void> toggleReminder(String id) async {
+    await _cloudRefresh;
     final index = _reminders.indexWhere((r) => r.id == id);
     if (index >= 0) _reminders[index] = _reminders[index].toggle();
     await _changed();
@@ -158,12 +252,14 @@ class AppStore extends ChangeNotifier {
     required bool largeText,
     required bool notifications,
   }) async {
+    await _cloudRefresh;
     this.largeText = largeText;
     this.notifications = notifications;
     await _changed();
   }
 
   Future<void> resetDemo() async {
+    await _cloudRefresh;
     _seed();
     _loadFailed = false;
     await _changed();
@@ -173,6 +269,7 @@ class AppStore extends ChangeNotifier {
     try {
       final raw = await storage.read();
       if (raw == null) {
+        if (cloud != null) _emptyCloudAccount();
         _loadFailed = false;
         await _changed();
         return;
@@ -204,7 +301,11 @@ class AppStore extends ChangeNotifier {
       storageError = null;
       _loadFailed = false;
     } catch (_) {
-      _seed();
+      if (cloud != null) {
+        _emptyCloudAccount();
+      } else {
+        _seed();
+      }
       _loadFailed = true;
       storageError = 'Деректер қорын оқу мүмкін болмады. Оқу мысалы ашылды, сақтау бұғатталды. Қайта іске қосыңыз немесе баптаулардан оқу деректерін қалпына келтіріңіз.';
     }

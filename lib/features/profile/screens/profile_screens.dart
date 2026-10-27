@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/app_scope.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/auth_errors.dart';
 import '../../../shared/widgets/app_widgets.dart';
 import '../../../shared/widgets/result_screen.dart';
 
@@ -21,6 +22,32 @@ class ProfileScreen extends StatelessWidget {
           icon: 'user',
           soft: true,
         ),
+        if (store.cloudEnabled) ...[
+          AppCard(
+            title: store.syncing
+                ? 'Синхрондау жүріп жатыр'
+                : store.cloudError != null
+                ? 'Бұлтты жаңарту қажет'
+                : 'Supabase қосылған',
+            subtitle:
+                store.cloudError ?? 'Операциялар аккаунтыңызда сақталады.',
+            icon: 'wallet',
+          ),
+          AppButton(
+            'Қайта синхрондау',
+            busy: store.syncing,
+            kind: ButtonKind.secondary,
+            onPressed: () async {
+              await store.syncCloud();
+              if (context.mounted) {
+                showMessage(
+                  context,
+                  store.cloudError ?? 'Бұлттағы деректер жаңартылды.',
+                );
+              }
+            },
+          ),
+        ],
         AppCard(
           title: 'Менің отбасым',
           subtitle: store.family,
@@ -45,10 +72,18 @@ class ProfileScreen extends StatelessWidget {
         AppButton(
           'Аккаунттан шығу',
           kind: ButtonKind.quiet,
-          onPressed: () {
-            store.signOut();
-            context.go('/login');
-          },
+          onPressed: store.syncing
+              ? null
+              : () async {
+                  try {
+                    await store.logout();
+                    if (context.mounted) context.go('/login');
+                  } catch (error) {
+                    if (context.mounted) {
+                      showMessage(context, authErrorMessage(error));
+                    }
+                  }
+                },
         ),
       ],
     );
@@ -60,7 +95,13 @@ class FamilyScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final store = AppScope.of(context);
-    final members = ['Жансая', 'Мирас', 'Данияр', 'Нұрсұлтан'];
+    final members = store.cloudEnabled
+        ? <String>{
+            store.name,
+            ...store.accessibleEntries.map((e) => e.owner),
+            ...store.goals.map((g) => g.owner),
+          }.toList()
+        : ['Жансая', 'Мирас', 'Данияр', 'Нұрсұлтан'];
     if (!members.contains(store.name)) members.add(store.name);
     return AppPage(
       title: 'Менің отбасым',
@@ -79,9 +120,11 @@ class FamilyScreen extends StatelessWidget {
             subtitle: member == 'Жансая' ? 'Әкімші' : 'Мүше',
             icon: 'user',
           ),
-        const Text(
-          'Жеке жазбалар жалпы тізімге кірмейді. '
-          'Бұл оқу нұсқасы бірнеше құрылғы арасында синхрондалмайды.',
+        Text(
+          store.cloudEnabled
+              ? 'Бұл деректер осы аккаунтқа тиесілі. Басқа аккаунттарды отбасына шақыру әлі қосылмаған.'
+              : 'Жеке жазбалар жалпы тізімге кірмейді. '
+                    'Бұл оқу нұсқасы бірнеше құрылғы арасында синхрондалмайды.',
           style: AppTheme.caption,
         ),
       ],
@@ -163,26 +206,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
           kind: ButtonKind.secondary,
           onPressed: () => context.push('/reset-password'),
         ),
-        AppButton(
-          'Оқу деректерін қалпына келтіру',
-          kind: ButtonKind.quiet,
-          onPressed: () async {
-            if (!await confirmAction(
-              context,
-              title: 'Оқу деректерін қалпына келтіру',
-              message:
-                  'Қосқан операциялар, мақсаттар және еске салғыштар '
-                  'бастапқы мысалдармен ауыстырылады.',
-              confirm: 'Қалпына келтіру',
-            )) {
-              return;
-            }
-            await store.resetDemo();
-            if (context.mounted) {
-              showMessage(context, 'Бастапқы мысалдар қалпына келтірілді.');
-            }
-          },
-        ),
+        if (!store.cloudEnabled)
+          AppButton(
+            'Оқу деректерін қалпына келтіру',
+            kind: ButtonKind.quiet,
+            onPressed: () async {
+              if (!await confirmAction(
+                context,
+                title: 'Оқу деректерін қалпына келтіру',
+                message:
+                    'Қосқан операциялар, мақсаттар және еске салғыштар '
+                    'бастапқы мысалдармен ауыстырылады.',
+                confirm: 'Қалпына келтіру',
+              )) {
+                return;
+              }
+              await store.resetDemo();
+              if (context.mounted) {
+                showMessage(context, 'Бастапқы мысалдар қалпына келтірілді.');
+              }
+            },
+          ),
       ],
     );
   }
