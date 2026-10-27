@@ -72,4 +72,3 @@ lesson4_storage_test.dart нақты уақытша Hive файлын ашады
 Операциялар мен таңдаулылар салыстырылады. Осы сценарийде HTTP клиентін құруға тыйым салынған.
 
 Құжаттама: https://pub.dev/packages/hive және https://pub.dev/packages/hive_flutter
-
