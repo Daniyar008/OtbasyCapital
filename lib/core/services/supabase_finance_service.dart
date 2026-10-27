@@ -56,6 +56,74 @@ class SupabaseFinanceService implements FinanceCloud {
     return rows;
   }
 
+  /// GET /rest/v1/otbasy_entries, scoped to the authenticated account.
+  Future<List<Map<String, dynamic>>> getEntries(String userId) =>
+      _rows('otbasy_entries', userId);
+
+  /// POST creates a new operation. ID/user_id are supplied by our model mapper.
+  Future<void> createEntry(String userId, Map<String, dynamic> row) async {
+    _requireAccount(userId);
+    if (row['user_id'] != userId) throw StateError('Invalid owner');
+    await client.from('otbasy_entries').insert(row);
+    _requireAccount(userId);
+  }
+
+  /// PATCH changes an existing operation without changing its identity.
+  Future<void> updateEntry(String userId, Map<String, dynamic> row) async {
+    _requireAccount(userId);
+    if (row['user_id'] != userId) throw StateError('Invalid owner');
+    final values = Map<String, dynamic>.from(row)
+      ..remove('id')
+      ..remove('user_id');
+    final updated = await client
+        .from('otbasy_entries')
+        .update(values)
+        .eq('user_id', userId)
+        .eq('family_id', 'family-main')
+        .eq('id', row['id'] as String)
+        .select('id');
+    _requireAccount(userId);
+    if (updated.length != 1) {
+      throw StateError('Operation was removed; retry sync');
+    }
+  }
+
+  /// DELETE removes only explicit IDs in the current account.
+  Future<void> deleteEntries(String userId, List<String> ids) async {
+    if (ids.isEmpty) return;
+    _requireAccount(userId);
+    await client
+        .from('otbasy_entries')
+        .delete()
+        .eq('user_id', userId)
+        .eq('family_id', 'family-main')
+        .inFilter('id', ids);
+    _requireAccount(userId);
+  }
+
+  Future<void> _writeEntries(
+    String userId,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    if (rows.isEmpty) return;
+    _requireAccount(userId);
+    final existing = await client
+        .from('otbasy_entries')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('family_id', 'family-main')
+        .inFilter('id', rows.map((row) => row['id'] as String).toList());
+    _requireAccount(userId);
+    final ids = existing.map((row) => row['id']).toSet();
+    for (final row in rows) {
+      if (ids.contains(row['id'])) {
+        await updateEntry(userId, row);
+      } else {
+        await createEntry(userId, row);
+      }
+    }
+  }
+
   @override
   Future<Map<String, dynamic>?> download(String userId) async {
     _requireAccount(userId);
@@ -66,7 +134,7 @@ class SupabaseFinanceService implements FinanceCloud {
         .eq('id', 'family-main');
     _requireAccount(userId);
     if (families.isEmpty) return null;
-    final entries = await _rows('otbasy_entries', userId);
+    final entries = await getEntries(userId);
     final goals = await _rows('otbasy_goals', userId);
     final reminders = await _rows('otbasy_reminders', userId);
     return {
@@ -175,8 +243,7 @@ class SupabaseFinanceService implements FinanceCloud {
           )
           .toList(),
     );
-    await _upsert(
-      'otbasy_entries',
+    await _writeEntries(
       userId,
       pending('entries', entries)
           .map(
@@ -236,6 +303,10 @@ class SupabaseFinanceService implements FinanceCloud {
     for (final type in ['entries', 'goals', 'reminders']) {
       final ids = (state['cloudDeleted_$type'] as List? ?? []).cast<String>();
       if (ids.isEmpty) continue;
+      if (type == 'entries') {
+        await deleteEntries(userId, ids);
+        continue;
+      }
       _requireAccount(userId);
       await client
           .from('otbasy_$type')

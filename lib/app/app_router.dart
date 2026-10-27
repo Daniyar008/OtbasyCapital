@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/auth/screens/auth_screens.dart';
@@ -11,6 +10,7 @@ import '../features/reminders/screens/reminder_screens.dart';
 import '../features/assistant/screens/assistant_screen.dart';
 import '../shared/widgets/app_widgets.dart';
 import '../shared/widgets/result_screen.dart';
+import '../shared/widgets/not_found_screen.dart';
 import 'app_store.dart';
 
 GoRouter createRouter(
@@ -20,6 +20,7 @@ GoRouter createRouter(
   initialLocation: initialLocation,
   refreshListenable: store,
   redirect: (context, state) {
+    if (state.error != null) return null;
     final path = state.uri.path;
     final public =
         const [
@@ -28,11 +29,13 @@ GoRouter createRouter(
           '/register',
           '/reset-password',
           '/result',
+          '/404',
         ].contains(path) ||
         path.startsWith('/onboarding/');
     return !store.signedIn && !public ? '/login' : null;
   },
   routes: [
+    GoRoute(path: '/404', builder: (_, _) => const NotFoundScreen()),
     GoRoute(path: '/', builder: (_, _) => const SplashScreen()),
     GoRoute(
       path: '/onboarding/:step',
@@ -107,14 +110,5 @@ GoRouter createRouter(
       ),
     ),
   ],
-  errorBuilder: (context, state) => AppPage(
-    title: 'Бет табылмады',
-    children: [
-      const Text('Бұл сілтеме бойынша экран жоқ.'),
-      AppButton(
-        'Басты бетке өту',
-        onPressed: () => context.go(store.signedIn ? '/home' : '/'),
-      ),
-    ],
-  ),
+  errorBuilder: (context, state) => NotFoundScreen(location: state.uri.path),
 );

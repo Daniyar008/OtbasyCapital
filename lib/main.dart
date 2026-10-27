@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 
-import 'app.dart';
+import 'app/startup_app.dart';
 import 'app/app_store.dart';
 import 'core/config/supabase_config.dart';
 import 'core/services/cloud_storage_service.dart';
 import 'core/services/supabase_finance_service.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  usePathUrlStrategy();
+  runApp(StartupApp(initialize: initializeApplication));
+}
+
+Future<AppStore> initializeApplication() async {
   await Hive.initFlutter();
   await Supabase.initialize(
     url: SupabaseConfig.url,
@@ -24,7 +30,5 @@ Future<void> main() async {
   );
   final store = AppStore(storage: cloud, cloud: cloud);
   await store.restoreCloudAccount();
-  runApp(
-    OtbasyApp(store: store, initialLocation: store.signedIn ? '/home' : '/'),
-  );
+  return store;
 }

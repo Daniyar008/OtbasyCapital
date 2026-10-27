@@ -22,6 +22,12 @@ Blueprint орнына қолмен **New → Static Site** ашылса:
 - Publish Directory: build/web
 - Rewrite: /* → /index.html
 
+Қолмен жасалған Static Site үшін rewrite ережесін Render Dashboard ішінде
+**Redirects/Rewrites → Add Rule** арқылы қосыңыз: Source `/*`, Destination
+`/index.html`, Action `Rewrite`. Blueprint-тегі render.yaml бұл ережені өзі береді;
+қолмен ашылған қызметке YAML баптауы автоматты қолданылмайды. Бұл ереже /404,
+/history сияқты тікелей адрестерді жаңартқанда Flutter бетін ашу үшін қажет.
+
 Жинақ тексерілмейінше сайт жарияланды деп есептелмейді. Нақты Render адресі
 қызмет құрылғаннан кейін ғана белгілі болады. Авторизацияны пайдаланушы өзі өтеді.
 

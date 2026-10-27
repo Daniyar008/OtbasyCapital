@@ -6,6 +6,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'finance_cloud.dart';
 import 'finance_repository.dart';
 import 'storage_service.dart';
+import 'sync_state.dart';
 
 /// Save to account-specific Hive first, then send to PostgreSQL over HTTPS.
 /// Failed uploads remain durable and retry on next save, login or manual refresh.
@@ -18,6 +19,33 @@ class CloudStorageService extends ChangeNotifier implements StorageService {
   StackTrace? lastErrorStack;
   bool syncing = false;
   DateTime? lastSynced;
+  SyncPhase phase = SyncPhase.idle;
+  SyncFailure? failure;
+
+  void _start() {
+    syncing = true;
+    phase = SyncPhase.loading;
+    notifyListeners();
+  }
+
+  void _success() {
+    phase = SyncPhase.success;
+    failure = null;
+    cloudError = null;
+    lastError = null;
+    lastErrorStack = null;
+    lastSynced = DateTime.now();
+  }
+
+  void _fail(Object error, StackTrace stack, {required bool savedLocally}) {
+    lastError = error;
+    lastErrorStack = stack;
+    failure = classifySyncFailure(error);
+    phase = SyncPhase.error;
+    cloudError =
+        '${savedLocally ? 'Құрылғыда сақталды. ' : ''}'
+        '${syncFailureMessage(failure!)}';
+  }
 
   factory CloudStorageService.local(FinanceCloud backend) {
     final stores = <String, StorageService>{};
@@ -48,8 +76,7 @@ class CloudStorageService extends ChangeNotifier implements StorageService {
     var raw = await local.read();
     // A damaged local file must not be silently replaced by remote data.
     final state = raw == null ? null : _decode(raw);
-    syncing = true;
-    notifyListeners();
+    _start();
     try {
       if (state?['cloudDirty'] == true) {
         await _push(id, state!, local);
@@ -73,15 +100,9 @@ class CloudStorageService extends ChangeNotifier implements StorageService {
         await local.write(jsonEncode(merged));
         raw = await local.read();
       }
-      cloudError = null;
-      lastError = null;
-      lastSynced = DateTime.now();
+      _success();
     } catch (error, stack) {
-      lastError = error;
-      lastErrorStack = stack;
-      cloudError =
-          'Бұлтқа қосылу мүмкін болмады. Жергілікті деректер ашылды. '
-          'Интернетті тексеріп, «Қайта синхрондау» түймесін басыңыз.';
+      _fail(error, stack, savedLocally: raw != null);
     } finally {
       syncing = false;
       notifyListeners();
@@ -122,19 +143,12 @@ class CloudStorageService extends ChangeNotifier implements StorageService {
     }
     next['cloudDirty'] = true;
     await local.write(jsonEncode(next));
-    syncing = true;
-    notifyListeners();
+    _start();
     try {
       await _push(id, next, local);
-      cloudError = null;
-      lastError = null;
-      lastSynced = DateTime.now();
+      _success();
     } catch (error, stack) {
-      lastError = error;
-      lastErrorStack = stack;
-      cloudError =
-          'Құрылғыда сақталды. Бұлт әлі жаңартылмады. '
-          'Интернетті тексеріп, «Қайта синхрондау» түймесін басыңыз.';
+      _fail(error, stack, savedLocally: true);
     } finally {
       syncing = false;
       notifyListeners();

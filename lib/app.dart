@@ -73,8 +73,18 @@ class _OtbasyAppState extends State<OtbasyApp> {
               ),
             );
             if (!wide) return screen;
-            return ColoredBox(
-              color: const Color(0xFFE7EDE7),
+            return DecoratedBox(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFFEDF2E8),
+                    Color(0xFFE4EEE7),
+                    Color(0xFFF5F2E9),
+                  ],
+                ),
+              ),
               child: Center(
                 child: Container(
                   width: width,

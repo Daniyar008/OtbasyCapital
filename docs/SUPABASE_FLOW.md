@@ -39,17 +39,21 @@
 изменений в отдельный Hive box `otbasy_cloud_<user UUID>`. Затем вызывается
 `SupabaseFinanceService.upload()`. Если сеть недоступна, очередь остаётся в Hive.
 
-В `lib/core/services/supabase_finance_service.dart` метод `_upsert()` содержит
-реальную отправку данных:
+В `lib/core/services/supabase_finance_service.dart` для операций используются
+отдельные методы `createEntry()` и `updateEntry()`:
 
 ```dart
-await client.from(table).upsert(rows, onConflict: 'user_id,id');
+await client.from('otbasy_entries').insert(row); // POST
+await client.from('otbasy_entries').update(values) // PATCH
+    .eq('user_id', userId).eq('family_id', 'family-main')
+    .eq('id', row['id'] as String).select('id');
 ```
 
-Для операций `table` равен `otbasy_entries`. SDK отправляет POST на
-`/rest/v1/otbasy_entries?on_conflict=user_id,id` с JSON телом и JWT пользователя.
+SDK отправляет POST или PATCH на `/rest/v1/otbasy_entries`
+с JSON телом и JWT пользователя. `_writeEntries()` сначала получает ID
+существующих строк, затем выбирает создание или изменение.
 Supabase Data API (PostgREST) переводит этот запрос в SQL для PostgreSQL.
-По смыслу это `INSERT ... ON CONFLICT (user_id, id) DO UPDATE ...`.
+POST соответствует INSERT, PATCH соответствует UPDATE с фильтрами владельца и ID.
 Полного SQL текста с подставленными значениями в Flutter-файлах нет: его формирует сервер.
 
 Перед операциями загружаются семья и участники, чтобы выполнялись внешние ключи.
@@ -63,7 +67,7 @@ Supabase Data API (PostgREST) переводит этот запрос в SQL д
   Это HTTP DELETE и серверный SQL DELETE только для указанных записей владельца.
 - `download()` использует `.select().eq('user_id', userId)` для чтения семьи и её данных.
   Это HTTP GET и SQL SELECT. Имя и сумма в интерфейсе берутся из загруженных строк.
-- `toggleFavorite()` меняет поле favorite. Изменение сохраняется тем же upsert.
+- `toggleFavorite()` меняет поле favorite. Изменение отправляется через PATCH.
 
 В DBeaver изменения видны после обновления таблицы или повторного SELECT.
 Query Manager DBeaver не следует считать журналом всех запросов других приложений:
@@ -107,8 +111,8 @@ Realtime, приглашения разных аккаунтов в общую �
 
 «Тіркелу кезінде қосымша Supabase Auth қызметіне сұрау жібереді. Пайдаланушы
 auth.users кестесінде құрылады. Операция сақталғанда алдымен Hive жаңарады,
-кейін Supabase Data API арқылы otbasy_entries кестесіне upsert жіберіледі.
-Сол ID бар болса, жол жаңарады; болмаса, жаңа жол қосылады. PostgreSQL-дегі
+кейін Supabase Data API арқылы otbasy_entries кестесіне сұрау жіберіледі.
+POST жаңа жол қосады, PATCH бар жолды жаңартады. PostgreSQL-дегі
 нәтижені DBeaver арқылы көруге болады. Рұқсат RLS арқылы тексеріледі».
 
 Official SDK references:

@@ -15,25 +15,39 @@ class SplashScreen extends StatelessWidget {
     title: 'Отбасы капиталы',
     children: [
       Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 110),
+        padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: AppColors.green,
-          borderRadius: BorderRadius.circular(20),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1A7058), Color(0xFF104D3D)],
+          ),
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.green.withValues(alpha: .12),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(13),
               decoration: BoxDecoration(
                 color: AppColors.accent,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(18),
               ),
               child: const AppIcon('home'),
             ),
-            const SizedBox(height: 22),
-            const Text('Отбасы\nкапиталы', style: AppTheme.amount),
-            const SizedBox(height: 22),
+            const SizedBox(height: 24),
+            Text(
+              'Отбасы\nкапиталы',
+              style: AppTheme.amount.copyWith(fontSize: 34, height: 1.18),
+            ),
+            const SizedBox(height: 18),
             Text(
               'Отбасы бюджеті бір жерде',
               style: AppTheme.body.copyWith(color: Colors.white),

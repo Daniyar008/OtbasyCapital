@@ -16,9 +16,14 @@ try {
             $relative = [Uri]::UnescapeDataString($context.Request.Url.AbsolutePath).TrimStart('/')
             if (!$relative) { $relative = 'index.html' }
             $file = [IO.Path]::GetFullPath((Join-Path $webRoot $relative))
-            if (!$file.StartsWith($webRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or !(Test-Path -LiteralPath $file -PathType Leaf)) {
+            if (!$file.StartsWith($webRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
                 $context.Response.StatusCode = 404
             } else {
+                if (!(Test-Path -LiteralPath $file -PathType Leaf)) {
+                    $navigation = ![IO.Path]::HasExtension($relative) -or $context.Request.Headers['Accept'] -like '*text/html*'
+                    if (!$navigation) { $context.Response.StatusCode = 404; continue }
+                    $file = Join-Path $webRoot 'index.html'
+                }
                 $extension = [IO.Path]::GetExtension($file)
                 $context.Response.ContentType = if ($types.ContainsKey($extension)) { $types[$extension] } else { 'application/octet-stream' }
                 $bytes = [IO.File]::ReadAllBytes($file)

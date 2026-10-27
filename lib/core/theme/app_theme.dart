@@ -1,22 +1,23 @@
 import 'package:flutter/material.dart';
 
 abstract final class AppColors {
-  static const green = Color(0xFF14634D);
-  static const ink = Color(0xFF182E27);
-  static const muted = Color(0xFF60736A);
+  static const green = Color(0xFF155F4C);
+  static const ink = Color(0xFF19382F);
+  static const muted = Color(0xFF62736A);
   static const surface = Colors.white;
-  static const background = Color(0xFFF3F6F2);
-  static const soft = Color(0xFFE2EEE5);
-  static const accent = Color(0xFFD9ED9A);
+  static const background = Color(0xFFF6F8F4);
+  static const soft = Color(0xFFE6EFE7);
+  static const accent = Color(0xFFDCEBB0);
   static const red = Color(0xFFA53535);
-  static const line = Color(0xFFD6E1D8);
+  static const line = Color(0xFFE0E7DF);
 }
 
 abstract final class AppTheme {
   static const title = TextStyle(
     fontFamily: 'Noto Sans',
-    fontSize: 28,
-    height: 1.4,
+    fontSize: 26,
+    height: 1.3,
+    letterSpacing: -.6,
     fontWeight: FontWeight.w700,
     color: AppColors.ink,
   );
@@ -105,5 +106,8 @@ abstract final class AppTheme {
       behavior: SnackBarBehavior.floating,
     ),
     dividerColor: AppColors.line,
+    progressIndicatorTheme: const ProgressIndicatorThemeData(
+      color: AppColors.green,
+    ),
   );
 }
