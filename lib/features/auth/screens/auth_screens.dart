@@ -151,6 +151,18 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _googleLogin() async {
+    setState(() => _busy = true);
+    try {
+      await AppScope.of(context).loginWithGoogle();
+      if (mounted && AppScope.of(context).signedIn) context.go('/home');
+    } catch (error) {
+      if (mounted) showMessage(context, authErrorMessage(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => AppPage(
     title: 'Қайта қош келдіңіз!',
@@ -182,6 +194,13 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
       AppButton('Кіру', busy: _busy, onPressed: _login),
+      if (AppScope.of(context).cloudEnabled)
+        AppButton(
+          'Google арқылы кіру',
+          kind: ButtonKind.secondary,
+          busy: _busy,
+          onPressed: _googleLogin,
+        ),
       AppButton(
         'Құпиясөзді ұмыттыңыз ба?',
         kind: ButtonKind.quiet,
