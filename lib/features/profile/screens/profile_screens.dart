@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/app_scope.dart';
+import '../../../core/services/notification_permission_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/auth_errors.dart';
 import '../../../shared/widgets/app_widgets.dart';
@@ -143,6 +144,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _large = false,
       _notifications = true,
       _busy = false;
+  final _notificationPermission = const NotificationPermissionService();
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -173,12 +175,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'Хабарландырулар',
           _notifications ? 'Қосулы' : 'Өшірулі',
           _notifications,
-          (value) => setState(() => _notifications = value),
+          _changeNotifications,
           const ValueKey('notifications'),
         ),
         const Text(
-          'Хабарландыру таңдауы сақталады. Жүйелік push хабарландырулар '
-          'бұл оқу нұсқасына қосылмаған.',
+          'Еске салғыштар осы баптаумен байланыстырылған. Android құрылғысында '
+          'қосылған кезде жүйелік рұқсат сұралады.',
           style: AppTheme.caption,
         ),
         AppButton(
@@ -229,6 +231,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
       ],
     );
+  }
+
+  Future<void> _changeNotifications(bool value) async {
+    if (!value) {
+      setState(() => _notifications = false);
+      return;
+    }
+    final state = await _notificationPermission.request();
+    if (!mounted) return;
+    switch (state) {
+      case NotificationPermissionState.granted:
+        setState(() => _notifications = true);
+        showMessage(context, 'Хабарландыруға рұқсат берілді.');
+        break;
+      case NotificationPermissionState.denied:
+        setState(() => _notifications = false);
+        showMessage(context, 'Хабарландыруға рұқсат берілмеді.');
+        break;
+      case NotificationPermissionState.unavailable:
+        setState(() => _notifications = true);
+        showMessage(
+          context,
+          'Браузерде жүйелік рұқсат сұралмайды. Android құрылғысында тексеріледі.',
+        );
+        break;
+    }
   }
 
   Widget _switch(

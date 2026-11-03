@@ -5,6 +5,7 @@ import '../../../app/app_scope.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/validators.dart';
+import '../../../core/services/reminder_notification_service.dart';
 import '../../../shared/widgets/app_widgets.dart';
 import '../../../shared/widgets/result_screen.dart';
 import '../models/payment_reminder.dart';
@@ -37,7 +38,17 @@ class RemindersScreen extends StatelessWidget {
               tooltip: r.done
                   ? 'Орындалмады деп белгілеу'
                   : 'Орындалды деп белгілеу',
-              onPressed: () => store.toggleReminder(r.id),
+              onPressed: () async {
+                await store.toggleReminder(r.id);
+                final updated = store.reminders.firstWhere(
+                  (item) => item.id == r.id,
+                );
+                if (updated.done) {
+                  await ReminderNotificationService.instance.cancel(updated.id);
+                } else if (store.notifications) {
+                  await ReminderNotificationService.instance.schedule(updated);
+                }
+              },
               icon: Icon(
                 r.done ? Icons.check_circle : Icons.radio_button_unchecked,
                 color: AppColors.green,
@@ -106,14 +117,16 @@ class _ReminderFormScreenState extends State<ReminderFormScreen> {
           if (!_form.currentState!.validate() || _busy) return;
           setState(() => _busy = true);
           final store = AppScope.of(context);
-          await store.addReminder(
-            PaymentReminder(
-              id: store.newId(),
-              title: _title.text.trim(),
-              date: _date,
-              monthly: _monthly,
-            ),
+          final reminder = PaymentReminder(
+            id: store.newId(),
+            title: _title.text.trim(),
+            date: _date,
+            monthly: _monthly,
           );
+          await store.addReminder(reminder);
+          if (store.notifications) {
+            await ReminderNotificationService.instance.schedule(reminder);
+          }
           if (context.mounted) {
             context.go(
               '/result',

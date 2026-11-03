@@ -7,6 +7,7 @@ import 'app/startup_app.dart';
 import 'app/app_store.dart';
 import 'core/config/supabase_config.dart';
 import 'core/services/cloud_storage_service.dart';
+import 'core/services/reminder_notification_service.dart';
 import 'core/services/supabase_finance_service.dart';
 
 void main() {
@@ -17,6 +18,7 @@ void main() {
 
 Future<AppStore> initializeApplication() async {
   await Hive.initFlutter();
+  await ReminderNotificationService.instance.initialize();
   await Supabase.initialize(
     url: SupabaseConfig.url,
     publishableKey: SupabaseConfig.publishableKey,
