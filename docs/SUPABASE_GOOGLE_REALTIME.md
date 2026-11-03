@@ -8,4 +8,4 @@ SQL орындалғаннан кейін Realtime кестесі мен `receip
 
 Отбасылық чат үшін SQL Editor-де `supabase/migrations/20261103_003_family_chat.sql` файлын да орындау керек. Бұл файл `otbasy_family_messages` кестесін құрып, оны `supabase_realtime` publication-ына қосады. Чат экранында хабарлар WebSocket арқылы автоматты жаңарады.
 
-Нағыз AI жауабы үшін Supabase Edge Functions -> Secrets ішінде `GEMINI_API_KEY` secret-ін сақтау керек. Содан кейін Edge Functions -> Deploy a new function -> Via Editor таңдап, атауын `ai-chat` деп жазыңыз да, `supabase/functions/ai-chat/index.ts` файлының кодын енгізіп Deploy басыңыз. Функция `gemini-2.5-flash-lite` моделін шақырады. API key Flutter коды мен GitHub-қа жазылмайды.
+Нағыз AI жауабы үшін Supabase Edge Functions -> Secrets ішінде `GEMINI_API_KEY` secret-ін сақтау керек. Содан кейін Edge Functions -> Deploy a new function -> Via Editor таңдап, атауын `ai-chat` деп жазыңыз да, `supabase/functions/ai-chat/index.ts` файлының кодын енгізіп Deploy басыңыз. Функция `gemini-3.5-flash-lite` моделін шақырады. API key Flutter коды мен GitHub-қа жазылмайды.
