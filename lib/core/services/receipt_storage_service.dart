@@ -21,16 +21,19 @@ class ReceiptStorageService {
     final safeExtension = ['jpg', 'jpeg', 'png', 'webp'].contains(extension)
         ? extension
         : 'jpg';
+    final contentType = switch (safeExtension) {
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      _ => 'image/jpeg',
+    };
     final path = '$userId/$entryId.$safeExtension';
     await client.storage
         .from('receipts')
         .uploadBinary(
           path,
           bytes,
-          fileOptions: FileOptions(
-            contentType: 'image/$safeExtension',
-            upsert: true,
-          ),
+          fileOptions: FileOptions(contentType: contentType, upsert: true),
         );
     return path;
   }
