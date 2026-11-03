@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../features/family/models/family_member.dart';
@@ -5,7 +6,8 @@ import 'finance_cloud.dart';
 
 /// These SDK calls send HTTPS to Supabase Auth and the PostgREST Data API.
 /// PostgreSQL credentials and SQL strings are never sent by the Flutter app.
-class SupabaseFinanceService implements FinanceCloud {
+class SupabaseFinanceService
+    implements FinanceCloud, RealtimeFinanceCloud, GoogleAuthCloud {
   SupabaseFinanceService(this.client);
   final SupabaseClient client;
 
@@ -25,6 +27,16 @@ class SupabaseFinanceService implements FinanceCloud {
     await client.auth.signInWithPassword(
       email: email.trim(),
       password: password,
+    );
+  }
+
+  @override
+  Future<void> signInWithGoogle() async {
+    await client.auth.signInWithOAuth(
+      OAuthProvider.google,
+      redirectTo: kIsWeb
+          ? Uri.base.origin
+          : 'kz.otbasy.otbasycapital://login-callback',
     );
   }
 
@@ -59,6 +71,18 @@ class SupabaseFinanceService implements FinanceCloud {
   /// GET /rest/v1/otbasy_entries, scoped to the authenticated account.
   Future<List<Map<String, dynamic>>> getEntries(String userId) =>
       _rows('otbasy_entries', userId);
+
+  /// Supabase Realtime listens to INSERT, UPDATE and DELETE events.
+  /// The stream emits a new list, so the UI can redraw without a refresh button.
+  @override
+  Stream<List<Map<String, dynamic>>> watchEntries(String userId) {
+    _requireAccount(userId);
+    return client
+        .from('otbasy_entries')
+        .stream(primaryKey: ['user_id', 'id'])
+        .eq('user_id', userId)
+        .eq('family_id', 'family-main');
+  }
 
   /// POST creates a new operation. ID/user_id are supplied by our model mapper.
   Future<void> createEntry(String userId, Map<String, dynamic> row) async {
@@ -158,6 +182,7 @@ class SupabaseFinanceService implements FinanceCloud {
               'note': r['note'],
               'shared': r['shared'],
               'favorite': r['favorite'],
+              'receiptPath': r['receipt_path'],
             },
           )
           .toList(),
@@ -260,6 +285,7 @@ class SupabaseFinanceService implements FinanceCloud {
               'note': r['note'],
               'shared': r['shared'],
               'favorite': r['favorite'],
+              'receipt_path': r['receiptPath'],
             },
           )
           .toList(),

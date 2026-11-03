@@ -18,3 +18,14 @@ abstract interface class FinanceCloud {
   Future<Map<String, dynamic>?> download(String userId);
   Future<void> upload(String userId, Map<String, dynamic> state);
 }
+
+/// Optional capability used only by cloud backends that support Supabase Realtime.
+/// Keeping it separate lets local storage and unit-test fakes stay simple.
+abstract interface class RealtimeFinanceCloud {
+  Stream<List<Map<String, dynamic>>> watchEntries(String userId);
+}
+
+/// Optional login capability. Google itself is configured in Supabase Auth.
+abstract interface class GoogleAuthCloud {
+  Future<void> signInWithGoogle();
+}

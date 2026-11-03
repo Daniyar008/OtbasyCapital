@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_scope.dart';
 import '../../core/services/sync_state.dart';
+import '../../core/services/realtime_state.dart';
 import '../../core/theme/app_theme.dart';
 
 class CloudSyncBanner extends StatelessWidget {
@@ -82,6 +83,35 @@ class CloudSyncBanner extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(3),
               child: const LinearProgressIndicator(minHeight: 2),
+            ),
+          ],
+          if (!busy) ...[
+            const SizedBox(height: 5),
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: store.restartRealtime,
+              child: Row(
+                children: [
+                  Icon(
+                    store.realtimeState == RealtimeState.connected
+                        ? Icons.bolt_rounded
+                        : Icons.wifi_off_rounded,
+                    color: store.realtimeState == RealtimeState.connected
+                        ? AppColors.green
+                        : AppColors.muted,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      realtimeLabel(store.realtimeState),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTheme.caption.copyWith(fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ],

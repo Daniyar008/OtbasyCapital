@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
 import '../core/services/storage_service.dart';
 import '../core/services/cloud_storage_service.dart';
+import '../core/services/finance_cloud.dart';
+import '../core/services/realtime_state.dart';
 import '../features/transactions/models/money_entry.dart';
 import '../features/goals/models/savings_goal.dart';
 import '../features/reminders/models/payment_reminder.dart';
@@ -19,6 +22,9 @@ class AppStore extends ChangeNotifier {
   String? get cloudError => cloud?.cloudError;
   Future<void>? _cloudRefresh;
   bool get syncing => _cloudRefresh != null || (cloud?.syncing ?? false);
+  RealtimeState realtimeState = RealtimeState.idle;
+  StreamSubscription<List<Map<String, dynamic>>>? _realtimeSubscription;
+  Timer? _reconnectTimer;
 
   Future<void> login(String email, String password) async {
     if (cloud == null) {
@@ -29,6 +35,21 @@ class AppStore extends ChangeNotifier {
     await _pendingWrite;
     await cloud!.backend.signIn(email, password);
     await restoreCloudAccount();
+  }
+
+  /// Starts the Supabase OAuth page. On the web, the page returns to this app
+  /// and initializeApplication restores the session automatically.
+  Future<void> loginWithGoogle() async {
+    final backend = cloud?.backend;
+    if (backend is! GoogleAuthCloud) {
+      throw StateError('Google кіруі бұл нұсқада қолжетімсіз');
+    }
+    final google = backend as GoogleAuthCloud;
+    final finance = backend as FinanceCloud;
+    await google.signInWithGoogle();
+    if (finance.account != null) {
+      await restoreCloudAccount();
+    }
   }
 
   Future<bool> register(String email, String password, String name) async {
@@ -63,6 +84,7 @@ class AppStore extends ChangeNotifier {
     name = cloud!.backend.account!.name;
     email = cloud!.backend.account!.email;
     signedIn = true;
+    _startRealtime();
     notifyListeners();
   }
 
@@ -79,6 +101,7 @@ class AppStore extends ChangeNotifier {
     await _cloudRefresh;
     await _pendingWrite;
     if (cloud != null) {
+      _stopRealtime();
       await cloud!.backend.signOut();
       _seed();
       _entries = [];
@@ -93,6 +116,7 @@ class AppStore extends ChangeNotifier {
 
   @override
   void dispose() {
+    _stopRealtime();
     cloud?.removeListener(notifyListeners);
     super.dispose();
   }
@@ -155,6 +179,69 @@ class AppStore extends ChangeNotifier {
   }
 
   String newId() => DateTime.now().microsecondsSinceEpoch.toString();
+
+  /// A new Realtime list replaces only the operation list. Other local
+  /// screens (goals, reminders and settings) keep their current state.
+  void _startRealtime() {
+    _stopRealtime();
+    final backend = cloud?.backend;
+    if (backend is! RealtimeFinanceCloud) return;
+    final realtime = backend as RealtimeFinanceCloud;
+    final account = (backend as FinanceCloud).account;
+    if (account == null) return;
+    realtimeState = RealtimeState.connecting;
+    notifyListeners();
+    final id = account.id;
+    _realtimeSubscription = realtime
+        .watchEntries(id)
+        .listen(
+          (rows) {
+            if (cloud?.backend.account?.id != id) return;
+            _entries = rows
+                .map(
+                  (row) => MoneyEntry(
+                    id: row['id'] as String,
+                    familyId: row['family_id'] as String? ?? 'family-main',
+                    title: row['title'] as String,
+                    amount: (row['amount'] as num).toInt(),
+                    income: row['income'] as bool,
+                    category: row['category'] as String,
+                    date: DateTime.parse(row['entry_date'] as String),
+                    owner: row['owner_name'] as String,
+                    note: row['note'] as String? ?? '',
+                    shared: row['shared'] as bool? ?? true,
+                    favorite: row['favorite'] as bool? ?? false,
+                    receiptPath: row['receipt_path'] as String?,
+                  ),
+                )
+                .toList();
+            realtimeState = RealtimeState.connected;
+            notifyListeners();
+          },
+          onError: (_, _) {
+            if (cloud?.backend.account?.id != id) return;
+            realtimeState = RealtimeState.offline;
+            notifyListeners();
+            _scheduleReconnect();
+          },
+        );
+  }
+
+  void _scheduleReconnect() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(const Duration(seconds: 5), _startRealtime);
+  }
+
+  Future<void> restartRealtime() async => _startRealtime();
+
+  void _stopRealtime() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _realtimeSubscription?.cancel();
+    _realtimeSubscription = null;
+    realtimeState = RealtimeState.idle;
+  }
+
   void signIn(String email, {String? name}) {
     if (cloud != null) throw StateError('Use Supabase login');
     this.email = email.trim();
