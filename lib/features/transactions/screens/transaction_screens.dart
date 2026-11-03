@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../app/app_scope.dart';
 import '../../../app/app_store.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/receipt_storage_service.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/validators.dart';
 import '../../../shared/widgets/app_widgets.dart';
@@ -147,6 +149,7 @@ class DetailScreen extends StatelessWidget {
           subtitle: entry.note.isEmpty ? 'Ескертпе жоқ' : entry.note,
           icon: 'wallet',
         ),
+        if (entry.receiptPath != null) ReceiptPreview(path: entry.receiptPath!),
         AppButton('Өзгерту', onPressed: () => context.push('/entry/$id/edit')),
         AppButton(
           entry.favorite ? 'Таңдаулылардан алып тастау' : 'Таңдаулыларға қосу',
@@ -208,6 +211,9 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
   late String _category;
   late bool _income, _shared;
   bool _busy = false, _initialized = false;
+  final _picker = ImagePicker();
+  Uint8List? _receiptBytes;
+  String _receiptExtension = 'jpg';
   @override
   void initState() {
     super.initState();
@@ -242,30 +248,79 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
     if (_busy || !_form.currentState!.validate()) return;
     setState(() => _busy = true);
     final store = AppScope.of(context);
-    await store.saveEntry(
-      MoneyEntry(
-        id: widget.entry?.id ?? store.newId(),
-        title: _title.text.trim(),
-        amount: int.parse(_amount.text.replaceAll(' ', '')),
-        income: _income,
-        category: _income ? 'Кіріс' : _category,
-        date: _date,
-        owner: widget.entry?.owner ?? store.name,
-        shared: _shared,
-        note: _note.text.trim(),
-        favorite: widget.entry?.favorite ?? false,
-      ),
-    );
-    if (!mounted) return;
-    context.go(
-      '/result',
-      extra: ResultData(
-        title: widget.entry == null ? 'Операция сақталды' : 'Өзгеріс сақталды',
-        amount: money(store.balance),
-        message: 'Кіріс ${money(store.income)} · Шығыс ${money(store.expense)}',
-        secondaryDestination: '/home',
-      ),
-    );
+    final entryId = widget.entry?.id ?? store.newId();
+    try {
+      var receiptPath = widget.entry?.receiptPath;
+      if (_receiptBytes != null) {
+        if (!store.cloudEnabled) {
+          throw StateError('Фотоны сақтау үшін бұлттық аккаунт қажет.');
+        }
+        receiptPath = await ReceiptStorageService.instance.upload(
+          entryId: entryId,
+          bytes: _receiptBytes!,
+          extension: _receiptExtension,
+        );
+      }
+      await store.saveEntry(
+        MoneyEntry(
+          id: entryId,
+          title: _title.text.trim(),
+          amount: int.parse(_amount.text.replaceAll(' ', '')),
+          income: _income,
+          category: _income ? 'Кіріс' : _category,
+          date: _date,
+          owner: widget.entry?.owner ?? store.name,
+          shared: _shared,
+          note: _note.text.trim(),
+          favorite: widget.entry?.favorite ?? false,
+          receiptPath: receiptPath,
+        ),
+      );
+      if (!mounted) return;
+      context.go(
+        '/result',
+        extra: ResultData(
+          title: widget.entry == null
+              ? 'Операция сақталды'
+              : 'Өзгеріс сақталды',
+          amount: money(store.balance),
+          message:
+              'Кіріс ${money(store.income)} · Шығыс ${money(store.expense)}',
+          secondaryDestination: '/home',
+        ),
+      );
+    } catch (error) {
+      if (mounted) showMessage(context, 'Сақтау орындалмады: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _pickReceipt(ImageSource source) async {
+    try {
+      final photo = await _picker.pickImage(
+        source: source,
+        imageQuality: 82,
+        maxWidth: 1600,
+      );
+      if (photo == null) return;
+      final name = photo.name.toLowerCase();
+      setState(() {
+        _receiptBytes = null;
+      });
+      final bytes = await photo.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _receiptBytes = bytes;
+        _receiptExtension = name.endsWith('.png')
+            ? 'png'
+            : name.endsWith('.webp')
+            ? 'webp'
+            : 'jpg';
+      });
+    } catch (_) {
+      if (mounted) showMessage(context, 'Суретті таңдау мүмкін болмады.');
+    }
   }
 
   @override
@@ -356,6 +411,34 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
         hint: 'Міндетті емес',
         inputKey: const ValueKey('entry-note'),
       ),
+      Text('Чек немесе фото', style: AppTheme.label),
+      Text(
+        'Қалауыңызша: галереядан жүктеңіз немесе камерамен түсіріңіз.',
+        style: AppTheme.caption.copyWith(color: AppColors.muted),
+      ),
+      const SizedBox(height: 8),
+      if (_receiptBytes != null)
+        ReceiptPreview(bytes: _receiptBytes)
+      else if (widget.entry?.receiptPath != null)
+        ReceiptPreview(path: widget.entry!.receiptPath!),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          OutlinedButton.icon(
+            key: const ValueKey('receipt-gallery'),
+            onPressed: () => _pickReceipt(ImageSource.gallery),
+            icon: const Icon(Icons.photo_library_outlined),
+            label: const Text('Фото таңдау'),
+          ),
+          OutlinedButton.icon(
+            key: const ValueKey('receipt-camera'),
+            onPressed: () => _pickReceipt(ImageSource.camera),
+            icon: const Icon(Icons.photo_camera_outlined),
+            label: const Text('Камера'),
+          ),
+        ],
+      ),
       AppButton(
         widget.entry == null ? 'Сақтау' : 'Өзгерісті сақтау',
         key: const ValueKey('save-entry'),
@@ -375,6 +458,62 @@ class _EntryFormScreenState extends State<EntryFormScreen> {
       ),
     ],
   );
+}
+
+class ReceiptPreview extends StatefulWidget {
+  const ReceiptPreview({super.key, this.path, this.bytes});
+  final String? path;
+  final Uint8List? bytes;
+
+  @override
+  State<ReceiptPreview> createState() => _ReceiptPreviewState();
+}
+
+class _ReceiptPreviewState extends State<ReceiptPreview> {
+  late Future<String?> _url;
+
+  @override
+  void initState() {
+    super.initState();
+    _url = ReceiptStorageService.instance.signedUrl(widget.path);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget image;
+    if (widget.bytes != null) {
+      image = Image.memory(widget.bytes!, fit: BoxFit.cover);
+    } else {
+      image = FutureBuilder<String?>(
+        future: _url,
+        builder: (context, snapshot) {
+          final url = snapshot.data;
+          if (url == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          return Image.network(
+            url,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) =>
+                const Center(child: Icon(Icons.receipt_long_outlined)),
+          );
+        },
+      );
+    }
+    return Container(
+      key: const ValueKey('receipt-preview'),
+      height: 156,
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 6, bottom: 10),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: AppColors.green.withValues(alpha: .05),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.green.withValues(alpha: .15)),
+      ),
+      child: image,
+    );
+  }
 }
 
 class SearchScreen extends StatefulWidget {

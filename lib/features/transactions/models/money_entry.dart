@@ -14,15 +14,17 @@ class MoneyEntry {
     this.shared = true,
     this.note = '',
     this.favorite = false,
+    this.receiptPath,
   });
   String get ownerId => FamilyMember.idForName(owner);
   final String familyId;
   final String id, title, category, owner, note;
+  final String? receiptPath;
   final int amount;
   final bool income, shared, favorite;
   final DateTime date;
   String get icon => category == 'Азық-түлік' ? 'food' : 'wallet';
-  MoneyEntry copyWith({bool? favorite}) => MoneyEntry(
+  MoneyEntry copyWith({bool? favorite, String? receiptPath}) => MoneyEntry(
     id: id,
     familyId: familyId,
     title: title,
@@ -34,6 +36,7 @@ class MoneyEntry {
     shared: shared,
     note: note,
     favorite: favorite ?? this.favorite,
+    receiptPath: receiptPath ?? this.receiptPath,
   );
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -48,6 +51,7 @@ class MoneyEntry {
     'shared': shared,
     'note': note,
     'favorite': favorite,
+    'receiptPath': receiptPath,
   };
   factory MoneyEntry.fromJson(Map<String, dynamic> json) => MoneyEntry(
     id: json['id'] as String,
@@ -61,5 +65,6 @@ class MoneyEntry {
     shared: json['shared'] as bool,
     note: json['note'] as String,
     favorite: json['favorite'] as bool,
+    receiptPath: json['receiptPath'] as String?,
   );
 }
