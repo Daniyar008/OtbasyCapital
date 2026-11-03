@@ -8,6 +8,7 @@ import '../features/goals/screens/goal_screens.dart';
 import '../features/profile/screens/profile_screens.dart';
 import '../features/reminders/screens/reminder_screens.dart';
 import '../features/assistant/screens/assistant_screen.dart';
+import '../features/chat/screens/family_chat_screen.dart';
 import '../shared/widgets/app_widgets.dart';
 import '../shared/widgets/result_screen.dart';
 import '../shared/widgets/not_found_screen.dart';
@@ -96,6 +97,7 @@ GoRouter createRouter(
     GoRoute(path: '/profile', builder: (_, _) => const ProfileScreen()),
     GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
     GoRoute(path: '/assistant', builder: (_, _) => const AssistantScreen()),
+    GoRoute(path: '/family-chat', builder: (_, _) => const FamilyChatScreen()),
     GoRoute(
       path: '/result',
       builder: (_, state) => ResultScreen(

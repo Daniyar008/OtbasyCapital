@@ -145,6 +145,12 @@ class HomeScreen extends StatelessWidget {
           subtitle: 'Бюджетіңіз туралы сұраңыз',
           onTap: () => context.push('/assistant'),
         ),
+        AppCard(
+          title: 'Отбасылық чат',
+          icon: 'user',
+          subtitle: 'Realtime хабарламалар және @көмекші',
+          onTap: () => context.push('/family-chat'),
+        ),
         AppButton(
           'Есептерді көру',
           kind: ButtonKind.secondary,
