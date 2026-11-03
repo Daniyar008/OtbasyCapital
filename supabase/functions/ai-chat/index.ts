@@ -62,7 +62,10 @@ Deno.serve(async (request) => {
         502,
       );
     }
-    const answer = data.candidates?.[0]?.content?.parts
+    const candidates = data.candidates as
+      | Array<{ content?: { parts?: Array<{ text?: string }> } }>
+      | undefined;
+    const answer = candidates?.[0]?.content?.parts
       ?.map((part: { text?: string }) => part.text ?? "")
       .join("")
       .trim();
