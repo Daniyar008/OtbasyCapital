@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/app_scope.dart';
+import '../../../core/services/ai_chat_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_widgets.dart';
-import '../services/budget_assistant.dart';
 
 class AssistantScreen extends StatefulWidget {
   const AssistantScreen({super.key});
@@ -16,6 +16,7 @@ class AssistantScreen extends StatefulWidget {
 class _AssistantScreenState extends State<AssistantScreen> {
   final _input = TextEditingController();
   final _messages = <_AssistantMessage>[];
+  bool _thinking = false;
 
   @override
   void initState() {
@@ -34,20 +35,27 @@ class _AssistantScreenState extends State<AssistantScreen> {
     super.dispose();
   }
 
-  void _ask([String? readyQuestion]) {
+  Future<void> _ask([String? readyQuestion]) async {
     final text = (readyQuestion ?? _input.text).trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _thinking) return;
     final store = AppScope.of(context);
     setState(() {
-      _messages
-        ..add(_AssistantMessage(text: text, fromAssistant: false))
-        ..add(
-          _AssistantMessage(
-            text: BudgetAssistant.reply(text, store),
-            fromAssistant: true,
-          ),
-        );
+      _messages.add(_AssistantMessage(text: text, fromAssistant: false));
       _input.clear();
+      _thinking = true;
+    });
+    var answer = '';
+    try {
+      answer = await AiChatService.instance.ask(text, store);
+    } catch (_) {
+      answer =
+          '${AiChatService.instance.localFallback(text, store)}\n\n'
+          'ЖИ сервисі қазір қолжетімсіз, сондықтан жергілікті есеп қолданылды.';
+    }
+    if (!mounted) return;
+    setState(() {
+      _messages.add(_AssistantMessage(text: answer, fromAssistant: true));
+      _thinking = false;
     });
   }
 
@@ -63,8 +71,8 @@ class _AssistantScreenState extends State<AssistantScreen> {
           borderRadius: BorderRadius.circular(20),
         ),
         child: const Text(
-          'Бұл көмекші осы қосымшадағы кіріс, шығыс және санат деректері '
-          'негізінде жауап береді.',
+          'Gemini AI бюджет деректерімен бірге жауап береді. Интернет болмаса, '
+          'жергілікті қысқа жауап қолданылады.',
           style: AppTheme.caption,
         ),
       ),
@@ -89,6 +97,18 @@ class _AssistantScreenState extends State<AssistantScreen> {
               style: AppTheme.body.copyWith(
                 color: item.fromAssistant ? AppColors.ink : Colors.white,
               ),
+            ),
+          ),
+        ),
+      if (_thinking)
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: EdgeInsets.all(12),
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
             ),
           ),
         ),

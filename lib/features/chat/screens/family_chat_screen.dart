@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_scope.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../features/assistant/services/budget_assistant.dart';
+import '../../../core/services/ai_chat_service.dart';
 import '../../../shared/widgets/app_widgets.dart';
 import '../models/family_chat_message.dart';
 import '../services/family_chat_service.dart';
@@ -34,9 +34,10 @@ class _FamilyChatScreenState extends State<FamilyChatScreen> {
       await _service.send(author: store.name, text: text);
       _message.clear();
       if (text.toLowerCase().contains('@көмекші')) {
+        final answer = await AiChatService.instance.ask(text, store);
         await _service.send(
           author: 'Қаржы көмекшісі',
-          text: BudgetAssistant.reply(text, store),
+          text: answer,
           isAssistant: true,
         );
       }
@@ -68,7 +69,7 @@ class _FamilyChatScreenState extends State<FamilyChatScreen> {
               Expanded(
                 child: Text(
                   'Хабарлар Supabase Realtime арқылы бірден жаңарады. '
-                  '@көмекші деп жазсаңыз, бюджет бойынша жауап береді.',
+                  '@көмекші деп жазсаңыз, Gemini AI бюджет бойынша жауап береді.',
                   style: AppTheme.caption,
                 ),
               ),
