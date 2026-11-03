@@ -47,10 +47,20 @@ Deno.serve(async (request) => {
         }),
       },
     );
-    const data = await response.json();
+    const raw = await response.text();
+    let data: Record<string, unknown> = {};
+    try {
+      data = JSON.parse(raw) as Record<string, unknown>;
+    } catch (_) {
+      console.error("Gemini returned non-JSON", response.status, raw);
+    }
     if (!response.ok) {
       console.error("Gemini error", response.status, data);
-      return json({ error: "Gemini жауап бере алмады" }, 502);
+      const upstream = (data.error as { message?: string } | undefined)?.message;
+      return json(
+        { error: `Gemini қатесі: ${upstream ?? "жауап алынбады"}` },
+        502,
+      );
     }
     const answer = data.candidates?.[0]?.content?.parts
       ?.map((part: { text?: string }) => part.text ?? "")

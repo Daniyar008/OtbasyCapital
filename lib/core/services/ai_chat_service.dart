@@ -27,8 +27,11 @@ class AiChatService {
       body: {'message': message, 'context': context},
     );
     final data = result.data;
-    if (data is Map && data['answer'] is String) {
-      return data['answer'] as String;
+    if (data is Map) {
+      if (data['answer'] is String) return data['answer'] as String;
+      if (data['error'] is String) {
+        throw StateError(data['error'] as String);
+      }
     }
     throw StateError('ЖИ сервисі дұрыс жауап қайтармады.');
   }
