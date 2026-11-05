@@ -79,6 +79,11 @@ class FinanceRepository implements StorageService {
     if (data['largeText'] is! bool || data['notifications'] is! bool) {
       throw const FormatException('Invalid settings');
     }
+    final budget = data['monthlyBudget'];
+    if (budget != null &&
+        (budget is! num || budget < 1000 || budget > 10000000)) {
+      throw const FormatException('Invalid monthly budget');
+    }
     return {
       ...data,
       'schema': 2,

@@ -74,12 +74,14 @@ void main() {
       final persistent = AppStore(storage: storage);
       await persistent.contribute('holiday', 10000);
       await persistent.setSettings(largeText: true, notifications: false);
+      await persistent.setMonthlyBudget(275000);
       final reopened = AppStore(storage: storage);
       await reopened.load();
       expect(reopened.goal('holiday')!.saved, 160000);
       expect(reopened.balance, 225000);
       expect(reopened.largeText, isTrue);
       expect(reopened.notifications, isFalse);
+      expect(reopened.totalBudget, 275000);
       persistent.dispose();
       reopened.dispose();
     },

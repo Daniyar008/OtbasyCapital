@@ -12,7 +12,7 @@ class BudgetScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final store = AppScope.of(context);
     final over = AppStore.categories
-        .where((c) => store.categoryExpense(c) >= AppStore.limits[c]! * .8)
+        .where((c) => store.categoryExpense(c) >= store.categoryBudget(c) * .8)
         .toList();
     return AppPage(
       title: 'Айлық бюджет',
@@ -25,6 +25,12 @@ class BudgetScreen extends StatelessWidget {
           amount: money(store.totalBudget),
           caption:
               'Жұмсалды ${money(store.expense)} · Қалды ${money(store.budgetLeft)}',
+        ),
+        AppCard(
+          title: 'Айлық лимитті өзгерту',
+          subtitle: 'Қазір: ${money(store.totalBudget)}',
+          icon: 'wallet',
+          onTap: () => _editBudget(context, store),
         ),
         _BudgetOverview(
           expense: store.expense,
@@ -49,7 +55,7 @@ class BudgetScreen extends StatelessWidget {
             title: category,
             icon: category == 'Азық-түлік' ? 'food' : 'wallet',
             subtitle:
-                '${money(store.categoryExpense(category))} / ${money(AppStore.limits[category]!)}',
+                '${money(store.categoryExpense(category))} / ${money(store.categoryBudget(category))}',
           ),
         Text(
           '${store.sharedView ? 'Ортақ' : 'Жеке'} есеп. Лимиттер — оқу мысалы.',
@@ -57,6 +63,73 @@ class BudgetScreen extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _editBudget(BuildContext context, AppStore store) async {
+    final controller = TextEditingController(
+      text: store.totalBudget.toString(),
+    );
+    final formKey = GlobalKey<FormState>();
+    final result = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Айлық лимит'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Сома, ₸',
+              hintText: 'Мысалы: 250000',
+            ),
+            validator: (value) {
+              final amount = int.tryParse((value ?? '').replaceAll(' ', ''));
+              if (amount == null || amount < 1000 || amount > 10000000) {
+                return '1 000 бен 10 000 000 ₸ аралығындағы соманы жазыңыз.';
+              }
+              return null;
+            },
+            onFieldSubmitted: (_) {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(
+                  dialogContext,
+                  int.parse(controller.text.replaceAll(' ', '')),
+                );
+              }
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Бас тарту'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(
+                  dialogContext,
+                  int.parse(controller.text.replaceAll(' ', '')),
+                );
+              }
+            },
+            child: const Text('Сақтау'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null) return;
+    try {
+      await store.setMonthlyBudget(result);
+      if (context.mounted) showMessage(context, 'Айлық лимит сақталды.');
+    } catch (_) {
+      if (context.mounted) {
+        showMessage(context, 'Лимитті сақтау кезінде қате шықты.');
+      }
+    }
   }
 }
 

@@ -23,32 +23,6 @@ class ProfileScreen extends StatelessWidget {
           icon: 'user',
           soft: true,
         ),
-        if (store.cloudEnabled) ...[
-          AppCard(
-            title: store.syncing
-                ? 'Синхрондау жүріп жатыр'
-                : store.cloudError != null
-                ? 'Бұлтты жаңарту қажет'
-                : 'Supabase қосылған',
-            subtitle:
-                store.cloudError ?? 'Операциялар аккаунтыңызда сақталады.',
-            icon: 'wallet',
-          ),
-          AppButton(
-            'Қайта синхрондау',
-            busy: store.syncing,
-            kind: ButtonKind.secondary,
-            onPressed: () async {
-              await store.syncCloud();
-              if (context.mounted) {
-                showMessage(
-                  context,
-                  store.cloudError ?? 'Бұлттағы деректер жаңартылды.',
-                );
-              }
-            },
-          ),
-        ],
         AppCard(
           title: 'Менің отбасым',
           subtitle: store.family,

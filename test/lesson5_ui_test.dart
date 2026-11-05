@@ -163,7 +163,7 @@ void main() {
   );
 
   testWidgets(
-    'loading success timeout offline and GET updates are visible without losing cache',
+    'cloud refresh keeps the current interface free from technical status text',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(390, 844);
@@ -191,7 +191,7 @@ void main() {
       await tester.pumpAndSettle();
       await refresh;
       expect(cloud.phase, SyncPhase.success);
-      expect(find.text('Бұлтта сақталды'), findsOneWidget);
+      expect(find.text('Бұлтта сақталды'), findsNothing);
       await capture(tester, 'lesson5_home');
 
       (backend.remote!['entries'] as List).first['amount'] = 6000;
@@ -199,7 +199,7 @@ void main() {
       refresh = store.syncCloud();
       await tester.pump(const Duration(milliseconds: 100));
       expect(cloud.phase, SyncPhase.loading);
-      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      expect(find.text('Деректер жаңартылып жатыр'), findsNothing);
       await capture(tester, 'lesson5_loading');
       backend.gate!.complete();
       await tester.pumpAndSettle();
@@ -213,7 +213,6 @@ void main() {
       await tester.pumpAndSettle();
       await refresh;
       expect(cloud.failure, SyncFailure.timeout);
-      expect(find.textContaining('уақытында жауап бермеді'), findsOneWidget);
       expect(store.entry('magnum')!.amount, 6000);
       await capture(tester, 'lesson5_timeout');
 

@@ -168,6 +168,7 @@ class SupabaseFinanceService
       'profileEmail': account!.email,
       'largeText': false,
       'notifications': true,
+      'monthlyBudget': 200000,
       'entries': entries
           .map(
             (r) => {

@@ -89,6 +89,7 @@ class CloudStorageService extends ChangeNotifier implements StorageService {
           ...remote,
           'largeText': state?['largeText'] ?? remote['largeText'],
           'notifications': state?['notifications'] ?? remote['notifications'],
+          'monthlyBudget': state?['monthlyBudget'] ?? remote['monthlyBudget'],
           'cloudDirty': false,
           'cloudDeleted_entries': [],
           'cloudDeleted_goals': [],

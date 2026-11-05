@@ -126,6 +126,7 @@ class AppStore extends ChangeNotifier {
       email = 'daniyar@example.com',
       family = 'Сұлтангереевтер';
   bool sharedView = true, largeText = false, notifications = true;
+  int monthlyBudget = defaultMonthlyBudget;
   String? storageError;
   bool _loadFailed = false;
   DateTime period = DateTime(2026, 10);
@@ -134,6 +135,7 @@ class AppStore extends ChangeNotifier {
   List<PaymentReminder> _reminders = [];
   Future<void> _pendingWrite = Future.value();
   static const categories = ['Азық-түлік', 'Көлік', 'Үй төлемдері', 'Басқа'];
+  static const defaultMonthlyBudget = 200000;
   static const limits = {
     'Азық-түлік': 60000,
     'Көлік': 35000,
@@ -161,7 +163,12 @@ class AppStore extends ChangeNotifier {
       .where((e) => !e.income)
       .fold(0, (sum, e) => sum + e.amount);
   int get balance => income - expense;
-  int get totalBudget => limits.values.fold(0, (sum, value) => sum + value);
+  int get totalBudget => monthlyBudget;
+  int categoryBudget(String category) {
+    final base = limits[category] ?? 0;
+    return (monthlyBudget * base / defaultMonthlyBudget).round();
+  }
+
   int get daysInPeriod => DateTime(period.year, period.month + 1, 0).day;
   int get plannedDailyLimit => (totalBudget / daysInPeriod).round();
   int get budgetLeft => totalBudget - expense;
@@ -285,6 +292,15 @@ class AppStore extends ChangeNotifier {
     await _changed();
   }
 
+  Future<void> setMonthlyBudget(int value) async {
+    await _cloudRefresh;
+    if (value < 1000 || value > 10000000) {
+      throw ArgumentError('Invalid monthly budget');
+    }
+    monthlyBudget = value;
+    await _changed();
+  }
+
   Future<void> saveEntry(MoneyEntry value) async {
     await _cloudRefresh;
     if (value.amount <= 0 || value.title.trim().isEmpty) {
@@ -399,6 +415,13 @@ class AppStore extends ChangeNotifier {
       email = json['profileEmail'] as String? ?? email;
       largeText = json['largeText'] as bool;
       notifications = json['notifications'] as bool;
+      final savedBudget = json['monthlyBudget'];
+      monthlyBudget = savedBudget is num
+          ? savedBudget.toInt()
+          : defaultMonthlyBudget;
+      if (monthlyBudget < 1000 || monthlyBudget > 10000000) {
+        monthlyBudget = defaultMonthlyBudget;
+      }
       storageError = null;
       _loadFailed = false;
     } catch (_) {
@@ -425,6 +448,7 @@ class AppStore extends ChangeNotifier {
       'profileEmail': email,
       'largeText': largeText,
       'notifications': notifications,
+      'monthlyBudget': monthlyBudget,
       'entries': _entries.map((e) => e.toJson()).toList(),
       'goals': _goals.map((e) => e.toJson()).toList(),
       'reminders': _reminders.map((e) => e.toJson()).toList(),
@@ -543,6 +567,7 @@ class AppStore extends ChangeNotifier {
     ];
     sharedView = true;
     period = DateTime(2026, 10);
+    monthlyBudget = defaultMonthlyBudget;
     storageError = null;
   }
 }

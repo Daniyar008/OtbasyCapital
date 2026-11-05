@@ -18,10 +18,12 @@ class FamilyChatService {
         .stream(primaryKey: ['id'])
         .eq('user_id', userId)
         .eq('family_id', 'family-main')
-        .order('created_at')
-        .map(
-          (rows) => rows.map(FamilyChatMessage.fromRow).toList(growable: false),
-        );
+        .map((rows) {
+          final messages =
+              rows.map(FamilyChatMessage.fromRow).toList(growable: true)
+                ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          return List.unmodifiable(messages);
+        });
   }
 
   Future<void> send({
@@ -40,5 +42,15 @@ class FamilyChatService {
       'message': message,
       'is_assistant': isAssistant,
     });
+  }
+
+  Future<void> clearMessages() async {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) throw StateError('Аккаунтқа кіріңіз.');
+    await client
+        .from('otbasy_family_messages')
+        .delete()
+        .eq('user_id', userId)
+        .eq('family_id', 'family-main');
   }
 }

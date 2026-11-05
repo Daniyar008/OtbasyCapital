@@ -16,13 +16,24 @@ class FamilyChatScreen extends StatefulWidget {
 
 class _FamilyChatScreenState extends State<FamilyChatScreen> {
   final _message = TextEditingController();
+  final _scroll = ScrollController();
   final _service = FamilyChatService.instance;
   bool _sending = false;
 
   @override
   void dispose() {
     _message.dispose();
+    _scroll.dispose();
     super.dispose();
+  }
+
+  void _scrollToLatest() {
+    if (!_scroll.hasClients) return;
+    _scroll.animateTo(
+      _scroll.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+    );
   }
 
   Future<void> _send() async {
@@ -33,6 +44,7 @@ class _FamilyChatScreenState extends State<FamilyChatScreen> {
     try {
       await _service.send(author: store.name, text: text);
       _message.clear();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToLatest());
       if (text.toLowerCase().contains('@көмекші')) {
         final answer = await AiChatService.instance.ask(text, store);
         await _service.send(
@@ -48,6 +60,27 @@ class _FamilyChatScreenState extends State<FamilyChatScreen> {
     }
   }
 
+  Future<void> _clearChat() async {
+    final confirmed = await confirmAction(
+      context,
+      title: 'Чатты тазалау',
+      message: 'Барлық ескі хабарлар осы аккаунттан жойылады.',
+      confirm: 'Тазалау',
+    );
+    if (!confirmed) return;
+    try {
+      await _service.clearMessages();
+      if (mounted) showMessage(context, 'Чат тазаланды.');
+    } catch (_) {
+      if (mounted) {
+        showMessage(
+          context,
+          'Чатты тазалау үшін Supabase SQL migration-ды бір рет орындаңыз.',
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final store = AppScope.of(context);
@@ -55,27 +88,13 @@ class _FamilyChatScreenState extends State<FamilyChatScreen> {
       title: 'Отбасылық чат',
       back: '/home',
       tab: 0,
+      scrollController: _scroll,
+      trailing: IconButton(
+        tooltip: 'Чатты тазалау',
+        onPressed: _sending ? null : _clearChat,
+        icon: const Icon(Icons.delete_outline_rounded),
+      ),
       children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.soft,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.forum_outlined, color: AppColors.green),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Хабарлар Supabase Realtime арқылы бірден жаңарады. '
-                  '@көмекші деп жазсаңыз, Gemini AI бюджет бойынша жауап береді.',
-                  style: AppTheme.caption,
-                ),
-              ),
-            ],
-          ),
-        ),
         StreamBuilder<List<FamilyChatMessage>>(
           stream: _service.watchMessages(),
           builder: (context, snapshot) {
@@ -90,6 +109,9 @@ class _FamilyChatScreenState extends State<FamilyChatScreen> {
               return const Center(child: CircularProgressIndicator());
             }
             final messages = snapshot.data!;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _scrollToLatest();
+            });
             if (messages.isEmpty) {
               return const EmptyState(
                 'Әзірге хабар жоқ',

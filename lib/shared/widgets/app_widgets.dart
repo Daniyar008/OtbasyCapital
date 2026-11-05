@@ -5,8 +5,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
-import '../../app/app_scope.dart';
-import 'cloud_sync_banner.dart';
 
 class AppIcon extends StatelessWidget {
   const AppIcon(this.name, {super.key, this.color});
@@ -376,6 +374,7 @@ class AppPage extends StatelessWidget {
     this.tab,
     this.formKey,
     this.trailing,
+    this.scrollController,
   });
   final String title;
   final List<Widget> children;
@@ -383,6 +382,7 @@ class AppPage extends StatelessWidget {
   final int? tab;
   final GlobalKey<FormState>? formKey;
   final Widget? trailing;
+  final ScrollController? scrollController;
   @override
   Widget build(BuildContext context) {
     final content = Column(
@@ -425,10 +425,6 @@ class AppPage extends StatelessWidget {
             if (trailing != null) ...[const SizedBox(width: 10), trailing!],
           ],
         ),
-        if (tab != null && AppScope.of(context).cloudEnabled) ...[
-          const SizedBox(height: 18),
-          const CloudSyncBanner(),
-        ],
         for (final child in children) ...[const SizedBox(height: 18), child],
       ],
     );
@@ -437,6 +433,7 @@ class AppPage extends StatelessWidget {
         bottom: false,
         child: SingleChildScrollView(
           key: const ValueKey('page-scroll'),
+          controller: scrollController,
           padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           child: TweenAnimationBuilder<double>(
