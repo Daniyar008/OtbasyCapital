@@ -58,3 +58,4 @@ verification/
 .github/modernize/
 /output/
 /tmp/
+/release/

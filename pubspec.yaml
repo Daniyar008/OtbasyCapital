@@ -1,7 +1,7 @@
 name: otbasy_capital
-description: "Отбасы капиталы — КМ07 практикалық жұмыс 5"
+description: "Отбасы капиталы — КМ07 финалдық мобильді жоба"
 publish_to: none
-version: 1.0.0+1
+version: 1.1.0+2
 environment:
   sdk: ^3.13.0
 dependencies:

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/app_scope.dart';
+import '../../../app/app_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_widgets.dart';
@@ -14,6 +15,14 @@ class HomeScreen extends StatelessWidget {
     final store = AppScope.of(context);
     final entries = store.visibleEntries;
     final goal = store.goals.firstOrNull;
+    final topCategory = AppStore.categories.reduce(
+      (current, next) =>
+          store.categoryExpense(current) >= store.categoryExpense(next)
+          ? current
+          : next,
+    );
+    final budgetLeft = store.budgetLeft;
+    final pendingReminders = store.reminders.where((item) => !item.done).length;
     return AppPage(
       title: 'Сәлем, ${store.name}!',
       tab: 0,
@@ -94,9 +103,17 @@ class HomeScreen extends StatelessWidget {
             ),
           ],
         ),
-        AppButton(
-          '+ Операция қосу',
-          onPressed: () => context.push('/entry/new'),
+        _QuickActions(
+          onAdd: () => context.push('/entry/new'),
+          onGoal: () => context.push('/goal/new'),
+          onReminder: () => context.push('/reminder/new'),
+        ),
+        _MonthlyFocus(
+          budgetLeft: budgetLeft,
+          topCategory: topCategory,
+          topCategoryExpense: store.categoryExpense(topCategory),
+          pendingReminders: pendingReminders,
+          dailyAmount: store.suggestedDailyAmount,
         ),
         const Text('Соңғы операциялар', style: AppTheme.heading),
         if (entries.isEmpty)
@@ -116,15 +133,17 @@ class HomeScreen extends StatelessWidget {
           title: 'Айлық бюджет',
           icon: 'wallet',
           subtitle:
-              '${money(store.expense)} / 200 000 ₸ · ${percent(store.expense, 200000)}%',
+              '${money(store.expense)} / ${money(store.totalBudget)} · ${percent(store.expense, store.totalBudget)}%',
           trailing: SizedBox(
             width: 32,
             height: 32,
             child: CircularProgressIndicator(
-              value: (store.expense / 200000).clamp(0, 1),
+              value: (store.expense / store.totalBudget).clamp(0, 1),
               strokeWidth: 3,
               backgroundColor: AppColors.soft,
-              color: store.expense > 200000 ? AppColors.red : AppColors.green,
+              color: store.expense > store.totalBudget
+                  ? AppColors.red
+                  : AppColors.green,
               semanticsLabel: 'Бюджеттің жұмсалған үлесі',
             ),
           ),
@@ -205,6 +224,164 @@ class _MoneySummary extends StatelessWidget {
             child: Text(
               amount,
               style: AppTheme.label.copyWith(fontSize: 17, color: color),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickActions extends StatelessWidget {
+  const _QuickActions({
+    required this.onAdd,
+    required this.onGoal,
+    required this.onReminder,
+  });
+
+  final VoidCallback onAdd, onGoal, onReminder;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      _QuickAction(icon: Icons.add_rounded, label: 'Операция', onTap: onAdd),
+      const SizedBox(width: 10),
+      _QuickAction(
+        icon: Icons.savings_outlined,
+        label: 'Мақсат',
+        onTap: onGoal,
+      ),
+      const SizedBox(width: 10),
+      _QuickAction(
+        icon: Icons.notifications_none_rounded,
+        label: 'Еске салу',
+        onTap: onReminder,
+      ),
+    ],
+  );
+}
+
+class _QuickAction extends StatelessWidget {
+  const _QuickAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Semantics(
+      button: true,
+      label: '$label қосу',
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: AppColors.green, size: 23),
+                const SizedBox(height: 5),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(label, style: AppTheme.caption),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _MonthlyFocus extends StatelessWidget {
+  const _MonthlyFocus({
+    required this.budgetLeft,
+    required this.topCategory,
+    required this.topCategoryExpense,
+    required this.pendingReminders,
+    required this.dailyAmount,
+  });
+
+  final int budgetLeft;
+  final String topCategory;
+  final int topCategoryExpense;
+  final int pendingReminders;
+  final int dailyAmount;
+
+  @override
+  Widget build(BuildContext context) {
+    final healthy = budgetLeft >= 0;
+    final headline = healthy
+        ? 'Бюджет жоспар шегінде'
+        : 'Айлық лимиттен асу байқалды';
+    final detail = topCategoryExpense == 0
+        ? 'Алғашқы операцияны қосып, айлық көріністі бақылаңыз.'
+        : 'Ең көп шығын: $topCategory - ${money(topCategoryExpense)}.';
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: healthy ? AppColors.soft : const Color(0xFFFFECE9),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: (healthy ? AppColors.green : AppColors.red).withValues(
+            alpha: .14,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .75),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              healthy ? Icons.auto_graph_rounded : Icons.warning_amber_rounded,
+              color: healthy ? AppColors.green : AppColors.red,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  headline,
+                  style: AppTheme.label.copyWith(
+                    color: healthy ? AppColors.green : AppColors.red,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(detail, style: AppTheme.caption),
+                const SizedBox(height: 5),
+                Text(
+                  healthy
+                      ? 'Қалған қаражатпен күніне шамамен ${money(dailyAmount)} жұмсауға болады.'
+                      : 'Келесі операцияны қоспас бұрын шығынды қарап шығыңыз.',
+                  style: AppTheme.caption.copyWith(fontWeight: FontWeight.w700),
+                ),
+                if (pendingReminders > 0) ...[
+                  const SizedBox(height: 5),
+                  Text(
+                    '$pendingReminders төлем еске салғышы күтілуде.',
+                    style: AppTheme.caption.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],

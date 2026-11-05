@@ -22,9 +22,15 @@ class BudgetScreen extends StatelessWidget {
         Text(monthLabel(store.period), style: AppTheme.caption),
         BalanceCard(
           label: 'Жалпы лимит',
-          amount: '200 000 ₸',
+          amount: money(store.totalBudget),
           caption:
-              'Жұмсалды ${money(store.expense)} · Қалды ${money(200000 - store.expense)}',
+              'Жұмсалды ${money(store.expense)} · Қалды ${money(store.budgetLeft)}',
+        ),
+        _BudgetOverview(
+          expense: store.expense,
+          total: store.totalBudget,
+          dailyLimit: store.plannedDailyLimit,
+          suggestedDailyAmount: store.suggestedDailyAmount,
         ),
         if (over.isNotEmpty)
           Container(
@@ -50,6 +56,71 @@ class BudgetScreen extends StatelessWidget {
           style: AppTheme.caption,
         ),
       ],
+    );
+  }
+}
+
+class _BudgetOverview extends StatelessWidget {
+  const _BudgetOverview({
+    required this.expense,
+    required this.total,
+    required this.dailyLimit,
+    required this.suggestedDailyAmount,
+  });
+
+  final int expense;
+  final int total;
+  final int dailyLimit;
+  final int suggestedDailyAmount;
+
+  @override
+  Widget build(BuildContext context) {
+    final over = expense > total;
+    final color = over ? AppColors.red : AppColors.green;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: over ? const Color(0xFFFFEFED) : AppColors.soft,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: .16)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                over ? Icons.warning_amber_rounded : Icons.insights_rounded,
+                color: color,
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  over
+                      ? 'Бюджет лимитінен асып кеттіңіз'
+                      : 'Бюджет жағдайы жақсы',
+                  style: AppTheme.label.copyWith(color: color),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          LinearProgressIndicator(
+            value: (expense / total).clamp(0, 1),
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(8),
+            color: color,
+            backgroundColor: Colors.white.withValues(alpha: .72),
+          ),
+          const SizedBox(height: 11),
+          Text(
+            over
+                ? 'Шығындарды санаттар бойынша қарап, келесі төлемді кейінге қалдырыңыз.'
+                : 'Жоспарлы орташа лимит: ${money(dailyLimit)} / күн. Қалған сома: ${money(suggestedDailyAmount)} / күн.',
+            style: AppTheme.caption,
+          ),
+        ],
+      ),
     );
   }
 }

@@ -161,6 +161,20 @@ class AppStore extends ChangeNotifier {
       .where((e) => !e.income)
       .fold(0, (sum, e) => sum + e.amount);
   int get balance => income - expense;
+  int get totalBudget => limits.values.fold(0, (sum, value) => sum + value);
+  int get daysInPeriod => DateTime(period.year, period.month + 1, 0).day;
+  int get plannedDailyLimit => (totalBudget / daysInPeriod).round();
+  int get budgetLeft => totalBudget - expense;
+  int get suggestedDailyAmount {
+    final today = DateTime.now();
+    final currentPeriod =
+        period.year == today.year && period.month == today.month;
+    final remainingDays = currentPeriod
+        ? (daysInPeriod - today.day + 1).clamp(1, daysInPeriod)
+        : daysInPeriod;
+    return budgetLeft <= 0 ? 0 : (budgetLeft / remainingDays).floor();
+  }
+
   int categoryExpense(String category) => visibleEntries
       .where((e) => !e.income && e.category == category)
       .fold(0, (sum, e) => sum + e.amount);
